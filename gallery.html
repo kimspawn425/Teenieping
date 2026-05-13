@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>티니핑 매핑 갤러리</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+    background: linear-gradient(160deg, #ffd6ec 0%, #fff5d6 50%, #d6f0ff 100%);
+    background-attachment: fixed;
+    color: #4a2a4a;
+    min-height: 100vh;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,170,200,0.3);
+    padding: 12px 16px;
+  }
+  .title {
+    font-weight: 900; color: #ff4f99; font-size: 18px;
+    background: linear-gradient(90deg, #ff5fa2, #ffae34);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .stat-row {
+    display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;
+  }
+  .stat {
+    background: linear-gradient(135deg,#fff5fa,#f0f7ff);
+    border-radius: 999px; padding: 4px 12px;
+    font-size: 13px; font-weight: 700; color: #6b4368;
+  }
+  .stat b { color: #ff4f99; }
+  .filter-row {
+    display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;
+  }
+  .filter-btn {
+    background: white;
+    border: 2px solid rgba(255,170,200,0.4);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-weight: 700; font-size: 13px;
+    color: #6b4368; cursor: pointer;
+    font-family: inherit;
+  }
+  .filter-btn.active {
+    background: linear-gradient(135deg,#ff6ab0,#ff8a3d);
+    color: white; border-color: transparent;
+  }
+  .search-input {
+    flex: 1; min-width: 180px;
+    padding: 6px 14px;
+    border: 2px solid rgba(255,170,200,0.4);
+    border-radius: 999px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+  .search-input:focus { border-color: #ff6ab0; }
+
+  main {
+    padding: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #4a2a4a;
+    margin: 20px 0 10px;
+    padding-bottom: 4px;
+    border-bottom: 2px dashed rgba(255,170,200,0.5);
+  }
+  .section-title .count {
+    font-size: 13px;
+    color: #8a6488;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .card {
+    background: white;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(180,110,200,0.1);
+    display: flex; flex-direction: column;
+    border: 2px solid white;
+    transition: transform .15s ease;
+  }
+  .card:hover { transform: translateY(-2px); }
+  .card .imgwrap {
+    aspect-ratio: 1/1;
+    background: linear-gradient(135deg,#fff5fa,#f0f7ff);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .card img {
+    width: 100%; height: 100%; object-fit: contain; padding: 8px;
+  }
+  .card .placeholder {
+    font-size: 48px; color: rgba(255,150,200,0.5);
+  }
+  .card .name {
+    padding: 8px;
+    text-align: center;
+    font-weight: 800;
+    font-size: 13px;
+    color: #4a2a4a;
+    background: white;
+  }
+  .card .meta {
+    font-size: 10px;
+    color: #8a6488;
+    text-align: center;
+    padding-bottom: 6px;
+    background: white;
+  }
+  .card.unmapped {
+    border-color: rgba(252,211,77,0.6);
+  }
+  .card.unmapped .imgwrap {
+    background: linear-gradient(135deg,#fef3c7,#fef9c3);
+  }
+  .card.unmapped .name {
+    color: #92400e;
+  }
+  .card.orphan {
+    border-color: rgba(251,113,133,0.5);
+  }
+  .card.orphan .name {
+    color: #be123c;
+    font-size: 11px;
+  }
+
+  .empty {
+    color: #8a6488;
+    text-align: center;
+    padding: 30px;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">🎀 티니핑 매핑 갤러리</div>
+  <div class="stat-row">
+    <div class="stat">매핑: <b id="statMapped">0</b></div>
+    <div class="stat">미매핑 캐릭터: <b id="statUnmapped">0</b></div>
+    <div class="stat">고아 이미지: <b id="statOrphan">0</b></div>
+    <div class="stat">스킵: <b id="statSkipped">0</b></div>
+    <div class="stat">전체 캐릭터: <b id="statTotal">0</b></div>
+  </div>
+  <div class="filter-row">
+    <button class="filter-btn active" data-filter="all">전체</button>
+    <button class="filter-btn" data-filter="mapped">매핑됨</button>
+    <button class="filter-btn" data-filter="unmapped">미매핑 캐릭터</button>
+    <button class="filter-btn" data-filter="orphan">고아 이미지</button>
+    <button class="filter-btn" data-filter="skipped">스킵된 파일</button>
+    <input id="searchInput" class="search-input" type="text" placeholder="🔍 검색..." />
+    <button id="orphanTrashBtn" class="filter-btn" style="background:#fee2e2;color:#991b1b;border-color:rgba(252,113,133,0.5);">
+      🗑 고아 → _trash BAT
+    </button>
+  </div>
+</header>
+
+<main id="content"></main>
+
+<script src="images_index.js"></script>
+<script src="mapping.js" onerror=""></script>
+<script>
+// === 캐릭터 데이터 (index.html과 동기화) ===
+const CHARACTERS_BY_SEASON = {
+  '1기 메인/로열': ['하츄핑','라라핑','차차핑','아자핑','바로핑','해핑'],
+  '1기 큐브 티니핑': [
+    '키키핑','아잉핑','부끄핑','부투핑','깜빡핑','띠용핑','주르핑','차나핑','따라핑','나르핑',
+    '무셔핑','투투핑','차캐핑','떠벌핑','다조핑','화나핑','시러핑','바네핑','덜덜핑','그림핑',
+    '무거핑','꺼꿀핑','씽씽핑','베베핑','코자핑','딱풀핑','모야핑','토이핑','또까핑','플라핑',
+    '노라핑&노리핑','아휴핑','똑똑핑','꽁꽁핑','찌릿핑','홀로핑','앙대핑','악동핑'
+  ],
+  '2기 보석 (반짝반짝)': [
+    '조아핑','방글핑','믿어핑','다이아하츄핑',
+    '까르핑','아야핑','소원핑','토닥핑','쪼꼼핑','싹싹핑','맛나핑','포근핑','메모핑','공쥬핑',
+    '짝짝핑','주네핑','뚝딱핑','발레핑','원더핑'
+  ],
+  '3기 열쇠 (알쏭달쏭)': [
+    '꾸래핑','나나핑','솔찌핑','다해핑','플로라하츄핑',
+    '빨리핑','얌얌핑','뜨거핑','삐뽀핑','힘내핑','고쳐핑','아라핑','패션핑','꼼딱핑','퐁당핑',
+    '파티핑','꾸며핑','삐짐핑','아아핑','빙글핑','간호핑'
+  ],
+  '4기 디저트 (새콤달콤)': [
+    '샤샤핑','포실핑','말랑핑','베리하츄핑',
+    '캔디핑','머랭핑','샌드핑','또너핑','와플핑','롤리핑','마카핑','핫케핑','커핑&머핑',
+    '요거핑','눈꽃핑','푸딩핑','멜로핑','쪼꼬핑','뿌뿌핑'
+  ],
+  '5기 슈팅스타 로열': ['스타하츄핑','빛나핑','초롱핑','빤짝핑','왕자핑'],
+  '5기 슈팅스타 일반': [
+    '나눔핑','뽀뽀핑','루루핑','댄스핑','유리핑','몰래핑','함께핑',
+    '고고핑','훌라핑','뿌쵸핑','여우핑','깡총핑','뽀송핑','고마핑',
+    '아롱핑','다롱핑','딩동핑','나그네핑'
+  ],
+  '레전드': ['행운핑','새콤핑','달콤핑','오로라핑'],
+  '6기 프린세스 메인/로열': ['프린세스하츄핑','사뿐핑','아름핑','뽀니핑'],
+  '6기 프린세스 티니핑': [
+    '깨굴핑','샤를핑','트롯핑','다이아나핑','젠틀핑',
+    '야옹핑','롱롱핑','큐핑','슈슈핑','쿨쿨핑','이슬핑','스노우핑',
+    '실크핑','나비핑','차밍핑','뽀득핑','이클립스핑'
+  ],
+};
+const ALL_CHARACTERS = Object.values(CHARACTERS_BY_SEASON).flat();
+
+// === 상태 로드 ===
+// 우선순위: localStorage (라이브 작업) > mapping.js (디스크)
+const STORAGE_KEY = 'tnp_label_mapping_v1';
+const SKIP_KEY = 'tnp_label_skipped_v1';
+
+const lsMapping = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); // {file: char}
+const lsSkipped = new Set(JSON.parse(localStorage.getItem(SKIP_KEY) || '[]'));
+
+// localStorage에 데이터가 있으면 그것을 사용, 없으면 mapping.js
+let nameToFile = {}; // {char: file}
+if (Object.keys(lsMapping).length > 0) {
+  for (const [file, char] of Object.entries(lsMapping)) {
+    nameToFile[char] = file;
+  }
+} else if (window.MAPPING) {
+  nameToFile = { ...window.MAPPING };
+}
+
+const allImages = window.IMAGES_INDEX || [];
+const mappedFiles = new Set(Object.values(nameToFile));
+
+// === 통계 ===
+const mappedCount = Object.keys(nameToFile).length;
+const unmappedChars = ALL_CHARACTERS.filter(c => !nameToFile[c]);
+const orphanFiles = allImages.filter(f => !mappedFiles.has(f) && !lsSkipped.has(f));
+const skippedFiles = allImages.filter(f => lsSkipped.has(f));
+
+document.getElementById('statMapped').textContent = mappedCount;
+document.getElementById('statUnmapped').textContent = unmappedChars.length;
+document.getElementById('statOrphan').textContent = orphanFiles.length;
+document.getElementById('statSkipped').textContent = skippedFiles.length;
+document.getElementById('statTotal').textContent = ALL_CHARACTERS.length;
+
+// === 렌더 ===
+let currentFilter = 'all';
+let currentSearch = '';
+
+function makeCard({ name, file, kind, season }) {
+  const card = document.createElement('div');
+  card.className = 'card ' + (kind === 'orphan' ? 'orphan' : kind === 'unmapped' ? 'unmapped' : '');
+
+  const imgwrap = document.createElement('div');
+  imgwrap.className = 'imgwrap';
+  if (file) {
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.alt = name || file;
+    img.src = './images/' + encodeURIComponent(file);
+    img.onerror = () => {
+      imgwrap.innerHTML = '<div class="placeholder">⚠</div>';
+    };
+    imgwrap.appendChild(img);
+  } else {
+    imgwrap.innerHTML = '<div class="placeholder">?</div>';
+  }
+  card.appendChild(imgwrap);
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'name';
+  nameEl.textContent = name || file.slice(0, 16) + '…';
+  card.appendChild(nameEl);
+
+  if (season || kind === 'orphan' || kind === 'skipped') {
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    if (season) meta.textContent = season;
+    else if (kind === 'orphan') meta.textContent = '미매핑';
+    else if (kind === 'skipped') meta.textContent = '스킵됨';
+    card.appendChild(meta);
+  }
+  return card;
+}
+
+function passFilter(item) {
+  if (currentFilter === 'all') {
+    return item.kind === 'mapped' || item.kind === 'unmapped' || item.kind === 'orphan';
+  }
+  return item.kind === currentFilter;
+}
+
+function passSearch(item) {
+  if (!currentSearch) return true;
+  const q = currentSearch.toLowerCase();
+  return (item.name || '').toLowerCase().includes(q) ||
+         (item.file || '').toLowerCase().includes(q);
+}
+
+function render() {
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+
+  // 시즌별 캐릭터 (매핑/미매핑)
+  for (const [season, names] of Object.entries(CHARACTERS_BY_SEASON)) {
+    const items = names.map(name => ({
+      name,
+      file: nameToFile[name] || null,
+      kind: nameToFile[name] ? 'mapped' : 'unmapped',
+      season,
+    })).filter(passFilter).filter(passSearch);
+
+    if (items.length === 0) continue;
+
+    const title = document.createElement('div');
+    title.className = 'section-title';
+    title.innerHTML = `${season} <span class="count">${items.length}개</span>`;
+    content.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    items.forEach(it => grid.appendChild(makeCard(it)));
+    content.appendChild(grid);
+  }
+
+  // 고아 이미지 (캐릭터 미매핑)
+  if (currentFilter === 'all' || currentFilter === 'orphan') {
+    const orphanItems = orphanFiles.map(file => ({
+      name: null,
+      file,
+      kind: 'orphan',
+    })).filter(passSearch);
+    if (orphanItems.length > 0) {
+      const title = document.createElement('div');
+      title.className = 'section-title';
+      title.innerHTML = `🍂 고아 이미지 (캐릭터 미매핑) <span class="count">${orphanItems.length}개</span>`;
+      content.appendChild(title);
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      orphanItems.forEach(it => grid.appendChild(makeCard(it)));
+      content.appendChild(grid);
+    }
+  }
+
+  // 스킵된 파일
+  if (currentFilter === 'skipped') {
+    const skippedItems = skippedFiles.map(file => ({
+      name: null,
+      file,
+      kind: 'skipped',
+    })).filter(passSearch);
+    if (skippedItems.length === 0) {
+      content.innerHTML += '<div class="empty">스킵된 파일이 없어요</div>';
+    } else {
+      const title = document.createElement('div');
+      title.className = 'section-title';
+      title.innerHTML = `🗑 스킵된 파일 <span class="count">${skippedItems.length}개</span>`;
+      content.appendChild(title);
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      skippedItems.forEach(it => grid.appendChild(makeCard(it)));
+      content.appendChild(grid);
+    }
+  }
+
+  if (content.children.length === 0) {
+    content.innerHTML = '<div class="empty">조건에 맞는 항목이 없어요</div>';
+  }
+}
+
+// === 이벤트 ===
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    render();
+  });
+});
+document.getElementById('searchInput').addEventListener('input', e => {
+  currentSearch = e.target.value;
+  render();
+});
+
+// === 고아 이미지 → _trash BAT 다운로드 ===
+document.getElementById('orphanTrashBtn').addEventListener('click', () => {
+  if (orphanFiles.length === 0) {
+    alert('고아 이미지가 없어요. 모든 이미지가 캐릭터에 매핑됐거나 스킵됐어요.');
+    return;
+  }
+  if (!confirm(`고아 이미지 ${orphanFiles.length}개를 _trash로 이동하는 BAT 파일을 다운로드할까요?\n\n(다운로드 후 프로젝트 폴더에 두고 더블클릭하면 실행됩니다.)`)) return;
+
+  const escapeBat = s => s.replace(/"/g, '""');
+  const lines = [
+    '@echo off',
+    'chcp 65001 >nul',
+    'cd /d "%~dp0\\images"',
+    'if not exist "_trash" mkdir "_trash"',
+    'set /a moved=0',
+    'set /a missing=0',
+    '',
+    ...orphanFiles.map(f =>
+      `if exist "${escapeBat(f)}" (move /Y "${escapeBat(f)}" "_trash\\" >nul && set /a moved+=1) else (set /a missing+=1)`
+    ),
+    '',
+    'echo.',
+    `echo Done. Total orphan: ${orphanFiles.length}`,
+    'echo Moved: %moved%',
+    'echo Already gone: %missing%',
+    'echo.',
+    'pause',
+  ];
+  const content = '﻿' + lines.join('\r\n');
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'move_orphans_to_trash.bat';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+render();
+</script>
+</body>
+</html>

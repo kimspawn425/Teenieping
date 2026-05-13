@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>티니핑 이미지 라벨링 도구</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+    background: linear-gradient(160deg, #ffd6ec 0%, #fff5d6 50%, #d6f0ff 100%);
+    background-attachment: fixed;
+    color: #4a2a4a;
+    min-height: 100vh;
+    -webkit-tap-highlight-color: transparent;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,170,200,0.3);
+    padding: 10px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .title { font-weight: 900; color: #ff4f99; font-size: 16px; }
+  .stats { font-size: 13px; color: #6b4368; }
+  .stats b { color: #ff4f99; }
+  .progress-bar {
+    width: 100%; height: 6px; background: rgba(255,255,255,0.7);
+    border-radius: 999px; margin-top: 8px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg,#ff6ab0,#ffae34,#6ec8ff);
+    transition: width .3s ease;
+  }
+  .header-actions { display: flex; gap: 6px; }
+  .header-actions button {
+    background: white; border: 2px solid rgba(255,170,200,0.5); cursor: pointer;
+    padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 13px;
+    color: #6b4368;
+  }
+  .header-actions button.primary {
+    background: linear-gradient(135deg,#ff6ab0,#ff8a3d);
+    color: white; border-color: transparent;
+  }
+
+  main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: minmax(280px, 360px) 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 700px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  /* === Image panel === */
+  .image-panel {
+    background: white;
+    border-radius: 20px;
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(180,110,200,0.15);
+    position: sticky; top: 80px;
+    height: fit-content;
+  }
+  .image-wrap {
+    aspect-ratio: 1/1;
+    background: linear-gradient(135deg,#fff5fa,#f0f7ff);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; margin-bottom: 12px;
+    position: relative;
+  }
+  .image-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .image-info { font-size: 11px; color: #8a6488; word-break: break-all; line-height: 1.5; }
+  .image-info .fname { font-family: monospace; opacity: 0.7; font-size: 10px; }
+  .image-mapped {
+    background: linear-gradient(135deg,#86efac,#34d399);
+    color: white; padding: 6px 12px; border-radius: 999px;
+    font-weight: 700; font-size: 13px; margin-top: 8px;
+    display: inline-block;
+  }
+  .nav-buttons {
+    display: flex; gap: 8px; margin-top: 12px;
+  }
+  .nav-buttons button {
+    flex: 1; padding: 10px; border-radius: 12px;
+    border: none; background: white; cursor: pointer;
+    font-weight: 700; font-size: 14px; color: #6b4368;
+    box-shadow: 0 2px 0 rgba(255,170,200,0.4);
+  }
+  .nav-buttons button:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(255,170,200,0.4); }
+  .nav-buttons .skip {
+    background: #fef3c7; color: #92400e;
+  }
+  .nav-buttons .delete {
+    background: #fee2e2; color: #991b1b;
+  }
+  .search-tools {
+    display: flex; gap: 6px; margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .search-tools button, .search-tools a {
+    flex: 1; min-width: 0;
+    padding: 8px 6px; border-radius: 10px;
+    border: 2px solid rgba(96,165,250,0.4);
+    background: linear-gradient(135deg,#dbeafe,#e0f2fe);
+    color: #1e40af; cursor: pointer;
+    font-weight: 700; font-size: 12px;
+    text-decoration: none; text-align: center;
+    font-family: inherit;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .search-tools button:active, .search-tools a:active {
+    transform: scale(0.97);
+  }
+  .search-tools a.naver {
+    background: linear-gradient(135deg,#dcfce7,#bbf7d0);
+    color: #166534; border-color: rgba(52,211,153,0.4);
+  }
+
+  /* === Selection panel === */
+  .select-panel {
+    background: white;
+    border-radius: 20px;
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(180,110,200,0.15);
+  }
+  .search-box {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid rgba(255,170,200,0.4);
+    border-radius: 14px;
+    font-size: 16px;
+    margin-bottom: 12px;
+    font-family: inherit;
+    outline: none;
+  }
+  .search-box:focus { border-color: #ff6ab0; }
+
+  .season-group {
+    margin-bottom: 14px;
+  }
+  .season-title {
+    font-size: 11px;
+    color: #8a6488;
+    font-weight: 800;
+    margin-bottom: 6px;
+    padding: 0 4px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .character-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 6px;
+  }
+  .char-btn {
+    background: #fff;
+    border: 2px solid rgba(255,170,200,0.3);
+    border-radius: 10px;
+    padding: 8px 6px;
+    font-weight: 700;
+    font-size: 13px;
+    color: #4a2a4a;
+    cursor: pointer;
+    transition: all .15s ease;
+    font-family: inherit;
+    text-align: center;
+  }
+  .char-btn:hover { border-color: #ff6ab0; background: #fff5fa; }
+  .char-btn:active { transform: scale(0.95); }
+  .char-btn.mapped {
+    background: linear-gradient(135deg,#dcfce7,#bbf7d0);
+    border-color: #34d399;
+    color: #166534;
+  }
+  .char-btn.mapped::after {
+    content: ' ✓';
+    color: #16a34a;
+  }
+  .char-btn.current-target {
+    background: linear-gradient(135deg,#ff6ab0,#ff8a3d);
+    color: white;
+    border-color: transparent;
+  }
+  .char-btn.hidden { display: none; }
+
+  .empty-state {
+    text-align: center; padding: 40px 20px; color: #8a6488;
+  }
+  .empty-state h2 { color: #ff4f99; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: rgba(40,20,40,0.9); color: white;
+    padding: 10px 18px; border-radius: 999px;
+    font-weight: 700; font-size: 13px;
+    transition: transform .3s ease;
+    z-index: 100; pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .help {
+    font-size: 11px; color: #8a6488; text-align: center; margin-top: 10px;
+    line-height: 1.6;
+  }
+  .help kbd {
+    background: #fff; border: 1px solid #ccc; border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 6px; font-family: monospace; font-size: 11px;
+  }
+
+  /* 검증 모달 */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: none; align-items: center; justify-content: center;
+    z-index: 200; padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: white; border-radius: 20px; padding: 20px;
+    max-width: 700px; max-height: 85vh; width: 100%;
+    overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  }
+  .modal h2 {
+    margin: 0 0 12px; color: #ff4f99; font-size: 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal .close-x {
+    background: none; border: none; font-size: 24px; cursor: pointer;
+    color: #8a6488; padding: 4px 8px;
+  }
+  .modal .stat-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px; margin-bottom: 16px;
+  }
+  .modal .stat-card {
+    background: linear-gradient(135deg,#fff5fa,#f0f7ff);
+    border-radius: 12px; padding: 10px; text-align: center;
+  }
+  .modal .stat-card .num {
+    font-size: 22px; font-weight: 900; color: #ff4f99;
+  }
+  .modal .stat-card .label {
+    font-size: 11px; color: #6b4368; font-weight: 700;
+  }
+  .modal .section-title {
+    font-weight: 800; color: #4a2a4a; margin: 14px 0 6px;
+    border-bottom: 2px dashed rgba(255,170,200,0.4); padding-bottom: 4px;
+  }
+  .modal .missing-group {
+    background: #fef3c7; border-radius: 10px; padding: 10px;
+    margin-bottom: 8px;
+  }
+  .modal .missing-group .gname {
+    font-weight: 800; color: #92400e; font-size: 13px; margin-bottom: 4px;
+  }
+  .modal .missing-tags {
+    display: flex; flex-wrap: wrap; gap: 4px;
+  }
+  .modal .missing-tags span {
+    background: white; color: #92400e; padding: 3px 9px;
+    border-radius: 999px; font-size: 12px; font-weight: 700;
+  }
+  .modal .empty-good {
+    background: #dcfce7; color: #166534;
+    padding: 12px; border-radius: 10px; text-align: center;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="title">🎀 티니핑 이미지 라벨링 도구</div>
+    <div class="stats">
+      <b id="statMapped">0</b> 매핑됨 ·
+      <b id="statSkipped">0</b> 스킵 ·
+      <b id="statTotal">0</b> 전체 ·
+      <b id="statRemaining">0</b> 남음
+    </div>
+    <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+  </div>
+  <div class="header-actions">
+    <button id="verifyBtn">🔍 검증</button>
+    <button id="trashBtn">🗑 스킵→trash BAT</button>
+    <button id="exportBtn" class="primary">📥 mapping.js 다운로드</button>
+    <button id="resetBtn">초기화</button>
+  </div>
+</header>
+
+<main id="mainEl">
+  <!-- Left: image -->
+  <section class="image-panel">
+    <div class="image-wrap">
+      <img id="currentImg" alt="현재 이미지" />
+    </div>
+    <div class="image-info">
+      <div id="imgIndex">1 / 0</div>
+      <div class="fname" id="imgFname"></div>
+      <div id="mappedNote"></div>
+    </div>
+    <div class="nav-buttons">
+      <button id="prevBtn">← 이전</button>
+      <button id="skipBtn" class="skip">스킵 ⏭</button>
+      <button id="deleteBtn" class="delete">❌ 캐릭터 아님</button>
+      <button id="nextBtn">다음 →</button>
+    </div>
+    <div style="margin-top:8px;">
+      <button id="jumpUnprocessedBtn" style="width:100%;padding:10px;border-radius:12px;border:none;background:linear-gradient(135deg,#82b6ff,#b27dff);color:white;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 4px 0 rgba(130,110,255,0.3);">
+        ⏭ 다음 미처리 파일로 점프
+      </button>
+    </div>
+    <div class="search-tools">
+      <button id="openImgBtn" title="새 탭에서 이미지 크게 열기 (그 후 우클릭 → Google Lens)">
+        🔍 이미지 새 탭에서 열기
+      </button>
+      <a id="googleImagesBtn" href="https://images.google.com/" target="_blank" rel="noopener" title="Google 이미지 (탭에서 드래그&드롭)">
+        🌐 Google 이미지
+      </a>
+      <a id="naverImageBtn" class="naver" href="https://search.naver.com/search.naver?where=image" target="_blank" rel="noopener" title="네이버 이미지 검색">
+        🟢 네이버 이미지
+      </a>
+    </div>
+    <div class="help">
+      <kbd>↑↓</kbd> 이전/다음 · <kbd>Esc</kbd> 검색지우기 · <kbd>Enter</kbd> 첫 후보<br/>
+      💡 <b>모르겠으면:</b> 이미지 위에서 <b>우클릭 → "Google Lens로 검색"</b><br/>
+      (Chrome) 또는 위 버튼으로 새 탭 연 다음 우클릭
+    </div>
+  </section>
+
+  <!-- Right: search + characters -->
+  <section class="select-panel">
+    <input id="searchBox" class="search-box" type="text"
+           placeholder="🔍 캐릭터 이름 검색 (예: 하츄, 마카, 그림...)"
+           autocomplete="off" />
+    <div id="characterGroups"></div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<div id="verifyModal" class="modal-overlay" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="modal">
+    <h2>
+      🔍 매핑 검증 결과
+      <button class="close-x" onclick="document.getElementById('verifyModal').classList.remove('show')">✕</button>
+    </h2>
+    <div id="verifyContent"></div>
+  </div>
+</div>
+
+<!-- 외부 파일에서 이미지 목록을 가져옴 -->
+<script src="images_index.js"></script>
+<!-- Claude가 자동 식별한 시드 데이터 (있을 때만 첫 실행에 사용) -->
+<script src="seed_data.js" onerror=""></script>
+<script>
+// ==== 캐릭터 데이터 (index.html과 동일) ====
+const CHARACTERS_BY_SEASON = {
+  '1기 메인/로열': ['하츄핑','라라핑','차차핑','아자핑','바로핑','해핑'],
+  '1기 큐브 티니핑': [
+    '키키핑','아잉핑','부끄핑','부투핑','깜빡핑','띠용핑','주르핑','차나핑','따라핑','나르핑',
+    '무셔핑','투투핑','차캐핑','떠벌핑','다조핑','화나핑','시러핑','바네핑','덜덜핑','그림핑',
+    '무거핑','꺼꿀핑','씽씽핑','베베핑','코자핑','딱풀핑','모야핑','토이핑','또까핑','플라핑',
+    '노라핑&노리핑','아휴핑','똑똑핑','꽁꽁핑','찌릿핑','홀로핑','앙대핑','악동핑'
+  ],
+  '2기 보석 (반짝반짝)': [
+    '조아핑','방글핑','믿어핑','다이아하츄핑',
+    '까르핑','아야핑','소원핑','토닥핑','쪼꼼핑','싹싹핑','맛나핑','포근핑','메모핑','공쥬핑',
+    '짝짝핑','주네핑','뚝딱핑','발레핑','원더핑'
+  ],
+  '3기 열쇠 (알쏭달쏭)': [
+    '꾸래핑','나나핑','솔찌핑','다해핑','플로라하츄핑',
+    '빨리핑','얌얌핑','뜨거핑','삐뽀핑','힘내핑','고쳐핑','아라핑','패션핑','꼼딱핑','퐁당핑',
+    '파티핑','꾸며핑','삐짐핑','아아핑','빙글핑','간호핑'
+  ],
+  '4기 디저트 (새콤달콤)': [
+    '샤샤핑','포실핑','말랑핑','베리하츄핑',
+    '캔디핑','머랭핑','샌드핑','또너핑','와플핑','롤리핑','마카핑','핫케핑','커핑&머핑',
+    '요거핑','눈꽃핑','푸딩핑','멜로핑','쪼꼬핑','뿌뿌핑'
+  ],
+  '5기 슈팅스타 로열': ['스타하츄핑','빛나핑','초롱핑','빤짝핑','왕자핑'],
+  '5기 슈팅스타 일반': [
+    '나눔핑','뽀뽀핑','루루핑','댄스핑','유리핑','몰래핑','함께핑',
+    '고고핑','훌라핑','뿌쵸핑','여우핑','깡총핑','뽀송핑','고마핑',
+    '아롱핑','다롱핑','딩동핑','나그네핑'
+  ],
+  '레전드': ['행운핑','새콤핑','달콤핑','오로라핑'],
+  '6기 프린세스 메인/로열': [
+    '프린세스하츄핑','사뿐핑','아름핑','뽀니핑'
+  ],
+  '6기 프린세스 티니핑': [
+    '깨굴핑','샤를핑','트롯핑','다이아나핑','젠틀핑',
+    '야옹핑','롱롱핑','큐핑','슈슈핑','쿨쿨핑','이슬핑','스노우핑',
+    '실크핑','나비핑','차밍핑','뽀득핑','이클립스핑'
+  ],
+};
+const ALL_CHARACTERS = Object.values(CHARACTERS_BY_SEASON).flat();
+
+// ==== 상태 ====
+const STORAGE_KEY = 'tnp_label_mapping_v1';
+const SKIP_KEY = 'tnp_label_skipped_v1';
+const POS_KEY = 'tnp_label_pos_v1';
+
+let mapping = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');  // {filename: character}
+let skipped = JSON.parse(localStorage.getItem(SKIP_KEY) || '[]');     // [filename...]
+let images = window.IMAGES_INDEX || [];
+let pos = parseInt(localStorage.getItem(POS_KEY) || '0', 10);
+if (pos >= images.length) pos = 0;
+
+// === 이름 마이그레이션 (정정된 이름으로 자동 변환) ===
+const RENAME_MAP = {
+  '롤링핑': '롤리핑',   // 오타 정정
+  '메롤핑': '멜로핑',   // 오타 정정
+  '반짝핑': '빤짝핑',   // 표기 정정
+  '노라핑': '노라핑&노리핑',  // 쌍둥이 합치기
+  '노리핑': '노라핑&노리핑',
+  '커핑':   '커핑&머핑',      // 페어 합치기
+  '머핑':   '커핑&머핑',
+};
+// 제거된 캐릭터 (실존하지 않거나 변신 형태)
+const REMOVED_NAMES = new Set([
+  '프린세스루미너스','프린세스다크니스','프린세스보니타',
+  '프린세스판타나','프린세스쁠리에','프린세스팬시하트',
+  '라츄핑'  // 실존하지 않는 캐릭터
+]);
+
+let migrationCount = 0;
+let removalCount = 0;
+const migratedMapping = {};
+for (const [fname, char] of Object.entries(mapping)) {
+  if (REMOVED_NAMES.has(char)) {
+    // 제거된 캐릭터로 매핑된 파일은 미처리로 되돌림 (스킵도 아니고 매핑도 아닌 상태)
+    removalCount++;
+    continue;
+  }
+  if (RENAME_MAP[char]) {
+    migratedMapping[fname] = RENAME_MAP[char];
+    migrationCount++;
+  } else {
+    migratedMapping[fname] = char;
+  }
+}
+if (migrationCount > 0 || removalCount > 0) {
+  mapping = migratedMapping;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(mapping));
+  console.log(`🔄 마이그레이션: ${migrationCount}개 이름 변경, ${removalCount}개 제거됨 (프린세스 라인)`);
+  setTimeout(() => {
+    const t = document.getElementById('toast');
+    if (t) {
+      t.textContent = `🔄 ${migrationCount}개 이름 정정, ${removalCount}개 프린세스 라인 제거`;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+  }, 500);
+}
+
+// 첫 실행: localStorage 비어있고 window.SEED_DATA가 있으면 시드를 초기 상태로 사용
+const isFirstRun = Object.keys(mapping).length === 0 && skipped.length === 0;
+if (isFirstRun && window.SEED_DATA) {
+  const sd = window.SEED_DATA;
+  // SEED_DATA.mapping은 {char: filename} 형태 → {filename: char}로 뒤집기
+  if (sd.mapping) {
+    for (const [char, fname] of Object.entries(sd.mapping)) {
+      mapping[fname] = char;
+    }
+  }
+  if (Array.isArray(sd.skipped)) {
+    skipped = sd.skipped.slice();
+  }
+  console.log(`🌱 Claude 시드 로드: ${Object.keys(mapping).length}개 매핑 + ${skipped.length}개 스킵`);
+  // 시드 적용 후 저장
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(mapping));
+  localStorage.setItem(SKIP_KEY, JSON.stringify(skipped));
+  // 첫 미처리 이미지로 점프
+  const processed = new Set([...Object.keys(mapping), ...skipped]);
+  for (let i = 0; i < images.length; i++) {
+    if (!processed.has(images[i])) { pos = i; break; }
+  }
+  localStorage.setItem(POS_KEY, pos.toString());
+}
+
+// ==== DOM ====
+const $ = id => document.getElementById(id);
+
+// ==== 렌더 ====
+function saveAll() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(mapping));
+  localStorage.setItem(SKIP_KEY, JSON.stringify(skipped));
+  localStorage.setItem(POS_KEY, pos.toString());
+}
+
+function renderCharacters() {
+  const groups = $('characterGroups');
+  groups.innerHTML = '';
+  // 이미 사용된 캐릭터 set
+  const usedChars = new Set(Object.values(mapping));
+
+  Object.entries(CHARACTERS_BY_SEASON).forEach(([season, names]) => {
+    const group = document.createElement('div');
+    group.className = 'season-group';
+    const title = document.createElement('div');
+    title.className = 'season-title';
+    title.textContent = season;
+    group.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'character-grid';
+    names.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'char-btn';
+      btn.textContent = name;
+      btn.dataset.name = name;
+      if (usedChars.has(name)) btn.classList.add('mapped');
+      btn.addEventListener('click', () => assignCharacter(name));
+      grid.appendChild(btn);
+    });
+    group.appendChild(grid);
+    groups.appendChild(group);
+  });
+}
+
+function renderImage() {
+  if (!images.length) {
+    $('mainEl').innerHTML = '<div class="empty-state"><h2>이미지가 없어요</h2><p>images 폴더에 webp/png/jpg 파일을 넣고 images_index.js를 갱신하세요.</p></div>';
+    return;
+  }
+  const fname = images[pos];
+  $('currentImg').src = './images/' + encodeURIComponent(fname);
+  $('imgIndex').textContent = `${pos+1} / ${images.length}`;
+  $('imgFname').textContent = fname.length > 60 ? fname.slice(0, 60) + '…' : fname;
+
+  const mappedTo = mapping[fname];
+  const isSkipped = skipped.includes(fname);
+  if (mappedTo) {
+    $('mappedNote').innerHTML = `<div class="image-mapped">✓ ${mappedTo} 로 매핑됨</div>`;
+  } else if (isSkipped) {
+    $('mappedNote').innerHTML = `<div class="image-mapped" style="background:linear-gradient(135deg,#fef3c7,#fcd34d);color:#92400e;">⏭ 스킵됨</div>`;
+  } else {
+    $('mappedNote').innerHTML = '';
+  }
+  updateStats();
+
+  // 현재 이 이미지에 매핑된 캐릭터 하이라이트
+  document.querySelectorAll('.char-btn').forEach(b => b.classList.remove('current-target'));
+  if (mappedTo) {
+    const btn = document.querySelector(`.char-btn[data-name="${mappedTo}"]`);
+    if (btn) {
+      btn.classList.add('current-target');
+      btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+}
+
+function updateStats() {
+  $('statMapped').textContent = Object.keys(mapping).length;
+  $('statSkipped').textContent = skipped.length;
+  $('statTotal').textContent = images.length;
+  const done = Object.keys(mapping).length + skipped.length;
+  $('statRemaining').textContent = images.length - done;
+  $('progressFill').style.width = (done / Math.max(1, images.length) * 100) + '%';
+}
+
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._tm);
+  showToast._tm = setTimeout(() => t.classList.remove('show'), 1500);
+}
+
+// ==== 조작 ====
+function assignCharacter(name) {
+  const fname = images[pos];
+  // 기존에 이 캐릭터에 매핑되어 있던 파일은 해제
+  for (const [k, v] of Object.entries(mapping)) {
+    if (v === name && k !== fname) {
+      delete mapping[k];
+    }
+  }
+  mapping[fname] = name;
+  // 스킵 목록에서 제거
+  skipped = skipped.filter(f => f !== fname);
+  saveAll();
+  renderCharacters();
+  showToast(`${name} ✓`);
+  nextImage();
+}
+
+function skipImage() {
+  const fname = images[pos];
+  if (!skipped.includes(fname)) skipped.push(fname);
+  // 매핑 해제
+  if (mapping[fname]) delete mapping[fname];
+  saveAll();
+  renderCharacters();
+  showToast('⏭ 스킵');
+  nextImage();
+}
+
+function deleteImage() {
+  const fname = images[pos];
+  if (!confirm(`"${fname}" 를(을) 라벨링 대상에서 제외할까요?\n(파일은 삭제되지 않고 스킵 목록에 추가됨)`)) return;
+  if (!skipped.includes(fname)) skipped.push(fname);
+  if (mapping[fname]) delete mapping[fname];
+  saveAll();
+  renderCharacters();
+  showToast('❌ 제외');
+  nextImage();
+}
+
+function nextImage() {
+  if (pos < images.length - 1) pos++;
+  saveAll();
+  renderImage();
+  $('searchBox').value = '';
+  filterCharacters('');
+  $('searchBox').focus();
+}
+
+function prevImage() {
+  if (pos > 0) pos--;
+  saveAll();
+  renderImage();
+  $('searchBox').value = '';
+  filterCharacters('');
+  $('searchBox').focus();
+}
+
+function filterCharacters(q) {
+  q = q.toLowerCase().trim();
+  document.querySelectorAll('.char-btn').forEach(btn => {
+    const name = btn.dataset.name.toLowerCase();
+    if (!q || name.includes(q)) btn.classList.remove('hidden');
+    else btn.classList.add('hidden');
+  });
+}
+
+function exportMapping() {
+  // {character: filename} 형태로 변환 (game이 쓰기 좋게)
+  const out = {};
+  for (const [fname, char] of Object.entries(mapping)) {
+    out[char] = fname;
+  }
+  // file:// 환경에서도 동작하도록 .js 파일로 export
+  const jsContent =
+    '// 자동 생성됨. label.html에서 다운로드한 파일이에요.\n' +
+    '// 이 파일을 프로젝트 루트(index.html 옆)에 두면 게임이 자동으로 사용해요.\n' +
+    'window.MAPPING = ' + JSON.stringify(out, null, 2) + ';\n';
+  const blob = new Blob([jsContent], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'mapping.js';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📥 mapping.js 다운로드! 프로젝트 폴더에 옮겨주세요');
+}
+
+function resetAll() {
+  if (!confirm('모든 라벨링 데이터를 초기화할까요? 되돌릴 수 없어요.')) return;
+  mapping = {};
+  skipped = [];
+  pos = 0;
+  saveAll();
+  renderCharacters();
+  renderImage();
+}
+
+// ==== 이벤트 ====
+$('nextBtn').addEventListener('click', nextImage);
+$('prevBtn').addEventListener('click', prevImage);
+$('skipBtn').addEventListener('click', skipImage);
+$('deleteBtn').addEventListener('click', deleteImage);
+$('exportBtn').addEventListener('click', exportMapping);
+$('resetBtn').addEventListener('click', resetAll);
+$('verifyBtn').addEventListener('click', verifyMapping);
+$('trashBtn').addEventListener('click', exportTrashBat);
+$('jumpUnprocessedBtn').addEventListener('click', jumpToNextUnprocessed);
+
+// ==== 다음 미처리 파일로 점프 ====
+function jumpToNextUnprocessed() {
+  const mappedSet = new Set(Object.keys(mapping));
+  const skippedSet = new Set(skipped);
+  // 현재 위치 다음부터 검색
+  for (let i = pos + 1; i < images.length; i++) {
+    if (!mappedSet.has(images[i]) && !skippedSet.has(images[i])) {
+      pos = i;
+      saveAll();
+      renderImage();
+      $('searchBox').value = '';
+      filterCharacters('');
+      $('searchBox').focus();
+      showToast(`⏭ ${pos+1}번 미처리 파일로 점프`);
+      return;
+    }
+  }
+  // 못 찾으면 처음부터 검색
+  for (let i = 0; i <= pos; i++) {
+    if (!mappedSet.has(images[i]) && !skippedSet.has(images[i])) {
+      pos = i;
+      saveAll();
+      renderImage();
+      $('searchBox').value = '';
+      filterCharacters('');
+      $('searchBox').focus();
+      showToast(`⏭ ${pos+1}번 미처리 파일로 점프 (처음으로 돌아감)`);
+      return;
+    }
+  }
+  showToast('🎉 모든 파일 처리 완료!');
+}
+
+// ==== 스킵된 파일들을 _trash로 이동하는 BAT 생성 ====
+function exportTrashBat() {
+  if (!skipped.length) {
+    showToast('스킵된 파일이 없어요');
+    return;
+  }
+  // 안전한 escape: 큰따옴표를 escape
+  const escapeBat = s => s.replace(/"/g, '""');
+  const lines = [
+    '@echo off',
+    'chcp 65001 >nul',
+    'cd /d "%~dp0\\images"',
+    'if not exist "_trash" mkdir "_trash"',
+    'set /a moved=0',
+    'set /a missing=0',
+    '',
+    ...skipped.map(f =>
+      `if exist "${escapeBat(f)}" (move /Y "${escapeBat(f)}" "_trash\\" >nul && set /a moved+=1) else (set /a missing+=1)`
+    ),
+    '',
+    'echo.',
+    `echo Done. Total skipped: ${skipped.length}`,
+    'echo Moved: %moved%',
+    'echo Already gone: %missing%',
+    'echo.',
+    'pause',
+  ];
+  const content = '﻿' + lines.join('\r\n');  // UTF-8 BOM for safety
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'move_skipped_to_trash.bat';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`📥 BAT 다운로드 (${skipped.length}개 이동 예정)`);
+}
+
+// ==== 매핑 검증 ====
+function verifyMapping() {
+  // 현재 매핑된 캐릭터 set
+  const mappedChars = new Set(Object.values(mapping));
+  // 매핑된 파일 set
+  const mappedFiles = new Set(Object.keys(mapping));
+  // 스킵된 파일 set
+  const skippedFiles = new Set(skipped);
+  // 미처리 파일
+  const unprocessed = images.filter(f => !mappedFiles.has(f) && !skippedFiles.has(f));
+
+  // 동일 캐릭터 중복 매핑 검사 (현재 로직상 자동 정리되지만 안전 차원)
+  const charCounts = {};
+  for (const ch of Object.values(mapping)) {
+    charCounts[ch] = (charCounts[ch] || 0) + 1;
+  }
+  const duplicates = Object.entries(charCounts).filter(([_,c]) => c > 1);
+
+  // 알 수 없는 캐릭터 (TINIPINGS에 없는데 매핑된 이름)
+  const allValidChars = new Set(ALL_CHARACTERS);
+  const unknownChars = [...mappedChars].filter(c => !allValidChars.has(c));
+
+  // 시즌별 누락 캐릭터
+  const missingBySeason = {};
+  for (const [season, names] of Object.entries(CHARACTERS_BY_SEASON)) {
+    const missing = names.filter(n => !mappedChars.has(n));
+    if (missing.length > 0) missingBySeason[season] = missing;
+  }
+
+  // HTML 생성
+  let html = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="num">${mappedChars.size}</div><div class="label">매핑된 캐릭터</div></div>
+      <div class="stat-card"><div class="num">${ALL_CHARACTERS.length}</div><div class="label">전체 캐릭터</div></div>
+      <div class="stat-card"><div class="num">${ALL_CHARACTERS.length - mappedChars.size}</div><div class="label">미매핑 캐릭터</div></div>
+      <div class="stat-card"><div class="num">${skippedFiles.size}</div><div class="label">스킵된 파일</div></div>
+      <div class="stat-card"><div class="num">${unprocessed.length}</div><div class="label">미처리 파일</div></div>
+    </div>
+  `;
+
+  // 중복 검사
+  html += `<div class="section-title">📌 중복 매핑 (한 캐릭터에 여러 파일)</div>`;
+  if (duplicates.length === 0) {
+    html += `<div class="empty-good">✅ 중복 없음. 깨끗해요!</div>`;
+  } else {
+    html += `<div class="missing-group"><div class="missing-tags">`;
+    duplicates.forEach(([ch, n]) => {
+      html += `<span style="background:#fecaca;color:#991b1b;">${ch} (${n}개 파일)</span>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // 알 수 없는 캐릭터
+  if (unknownChars.length > 0) {
+    html += `<div class="section-title">⚠️ TINIPINGS에 없는 이름</div>`;
+    html += `<div class="missing-group"><div class="missing-tags">`;
+    unknownChars.forEach(ch => {
+      html += `<span style="background:#fecaca;color:#991b1b;">${ch}</span>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // 시즌별 누락
+  html += `<div class="section-title">📋 매핑되지 않은 캐릭터 (시즌별)</div>`;
+  if (Object.keys(missingBySeason).length === 0) {
+    html += `<div class="empty-good">🎉 모든 캐릭터가 매핑됐어요!</div>`;
+  } else {
+    for (const [season, missing] of Object.entries(missingBySeason)) {
+      html += `<div class="missing-group">`;
+      html += `<div class="gname">${season} — ${missing.length}개 미매핑</div>`;
+      html += `<div class="missing-tags">`;
+      missing.forEach(n => html += `<span>${n}</span>`);
+      html += `</div></div>`;
+    }
+  }
+
+  // 미처리 파일 안내
+  if (unprocessed.length > 0) {
+    html += `<div class="section-title">📁 아직 처리 안 한 파일 ${unprocessed.length}개</div>`;
+    html += `<div style="font-size:12px;color:#8a6488;">아래 인덱스 번호로 이동하려면 도구를 닫고 ← → 키로 탐색하세요.</div>`;
+    html += `<div style="margin-top:6px;font-family:monospace;font-size:11px;color:#6b4368;">`;
+    const positions = unprocessed.slice(0, 30).map(f => images.indexOf(f) + 1);
+    html += `위치: ${positions.join(', ')}${unprocessed.length > 30 ? ' ...' : ''}`;
+    html += `</div>`;
+  }
+
+  $('verifyContent').innerHTML = html;
+  $('verifyModal').classList.add('show');
+}
+
+// 현재 이미지를 새 탭에서 열기 (그 후 우클릭 → Google Lens가 가장 빠름)
+$('openImgBtn').addEventListener('click', () => {
+  if (!images.length) return;
+  const url = './images/' + encodeURIComponent(images[pos]);
+  window.open(url, '_blank', 'noopener');
+});
+
+$('searchBox').addEventListener('input', e => filterCharacters(e.target.value));
+$('searchBox').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.target.value = ''; filterCharacters(''); }
+  else if (e.key === 'Enter') {
+    const firstVisible = document.querySelector('.char-btn:not(.hidden)');
+    if (firstVisible) assignCharacter(firstVisible.dataset.name);
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); nextImage(); }
+  else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); prevImage(); }
+  else if (e.key === 's' || e.key === 'S') skipImage();
+});
+
+// ==== 초기화 ====
+renderCharacters();
+renderImage();
+$('searchBox').focus();
+</script>
+</body>
+</html>
